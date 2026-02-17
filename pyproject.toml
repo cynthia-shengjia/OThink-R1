@@ -1,0 +1,57 @@
+[project]
+name = "othink-r1"
+version = "0.1.0"
+description = "OThink-R1: Redundant Reasoning Pruning for LLM Training"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10,<3.13"
+
+dependencies = [
+    # Deep Learning Core
+    "torch>=2.1.0",
+    
+    # Hugging Face Ecosystem
+    "transformers>=4.40.0",
+    "trl>=0.12.0",
+    "datasets>=2.18.0",
+    "accelerate>=0.30.0",
+    
+    # Inference Engine
+    "vllm>=0.6.0",
+    
+    # Configuration Management
+    "hydra-core>=1.3.0",
+    "omegaconf>=2.3.0",
+    
+    # Experiment Tracking
+    "wandb>=0.16.0",
+    
+    # Math Verification
+    "math-verify>=0.5.0",
+    
+    # Data Processing
+    "pandas>=2.0.0",
+    "pyarrow>=14.0.0",
+    
+    # API Client (for LLM Judge)
+    "openai>=1.0.0",
+    
+    # Utilities
+    "tqdm>=4.65.0",
+]
+
+[tool.uv]
+# 不把项目自身当作包来安装，纯依赖管理
+no-build-isolation = false
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
