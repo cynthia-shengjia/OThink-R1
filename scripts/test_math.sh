@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
-
-cd /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/OThinkR1Training
+cd ..
+cd ./OThinkR1Training
 
 echo "=========================================="
 echo "  测试 MATH 数据集推理 (前10条)"

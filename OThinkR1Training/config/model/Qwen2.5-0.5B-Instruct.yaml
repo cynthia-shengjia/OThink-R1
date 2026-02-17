@@ -2,7 +2,7 @@
 model:
   name: Qwen2.5-0.5B-Instruct
   model_size: 0.5B
-  path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/models/Qwen2.5-0.5B-Instruct
+  path: ../models/Qwen2.5-0.5B-Instruct
   inference:
     tensor_parallel_size: 1
     enable_prefix_caching: True

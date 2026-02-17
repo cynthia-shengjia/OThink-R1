@@ -3,7 +3,7 @@ data:
   datasets:
     ASDIV:
       _target_: core.test_processor.TestASDIVProcessor
-      path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/datasets/ASDIV
+      path: ../datasets/ASDIV
       splits:
         validation:
           name: validation

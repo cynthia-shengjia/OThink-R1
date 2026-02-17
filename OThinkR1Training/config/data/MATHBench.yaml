@@ -3,7 +3,7 @@ data:
   datasets:
     MATHBench:
       _target_: core.math_aime_processor.MATHProcessor
-      path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/datasets/MATH
+      path: ../datasets/MATH
       splits:
         test:
           name: test
