@@ -72,6 +72,8 @@ fi
 #   3. 生成/更新 uv.lock 锁文件
 #   4. 安装所有依赖到 .venv
 uv sync
+uv pip install modelscope
+uv pip install huggingface_hub
 
 echo ""
 echo "=========================================="
