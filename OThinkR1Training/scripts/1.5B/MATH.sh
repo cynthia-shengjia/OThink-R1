@@ -103,7 +103,7 @@ for beta1 in 0.0001; do
                 data=${TestDataset} \
                 model.inference.tensor_parallel_size=${GPUNUM} \
                 model.inference.gpu_memory_utilization=0.9 \
-.                +model.inference.repetition_penalty=1.1 \
+                +model.inference.repetition_penalty=1.1 \
                 model.inference.temperature=0.9 \
                 model.inference.top_p=0.95 \
                 model.inference.max_tokens=16384

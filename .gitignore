@@ -1,1 +1,6 @@
-/__pycache__/
+__pycache__/
+/models/
+/datasets/
+save_configs/
+log/
+uv.lock

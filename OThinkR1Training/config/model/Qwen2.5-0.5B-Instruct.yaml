@@ -1,0 +1,13 @@
+# @package _global_
+model:
+  name: Qwen2.5-0.5B-Instruct
+  model_size: 0.5B
+  path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/models/Qwen2.5-0.5B-Instruct
+  inference:
+    tensor_parallel_size: 1
+    enable_prefix_caching: True
+    gpu_memory_utilization: 0.9
+    temperature: 0.9
+    top_p: 0.95
+    max_tokens: 2048
+    skip_special_tokens: True
