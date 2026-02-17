@@ -1,0 +1,14 @@
+# @package _global_
+data:
+  datasets:
+    AIME:
+      _target_: core.math_aime_processor.AIMEProcessor
+      path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/datasets/AIME
+      splits:
+        train:
+          name: train
+          slice: "[:100%]"
+          columns_to_remove: []
+      verify: "math_verify"
+      subset:
+      eval_split: "train"
