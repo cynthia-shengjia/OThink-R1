@@ -15,6 +15,8 @@
 
 set -e
 
+conda deactivate 
+conda deactivate
 # ==================== 配置区 ====================
 CONDA_ENV_NAME="othink-r1"
 PYTHON_VERSION="3.11"
