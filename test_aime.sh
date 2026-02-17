@@ -1,11 +1,9 @@
 #!/bin/bash
 set -e
-cd ..
-cd ./OThinkR1Training
+eval "$(conda shell.bash hook)"
+conda activate othink-r1
 
-echo "=========================================="
-echo "  测试 MATH 数据集推理 (前10条)"
-echo "=========================================="
+cd OThinkR1Training
 
 uv run python eval.py \
     model=Qwen2.5-0.5B-Instruct \
@@ -14,10 +12,10 @@ uv run python eval.py \
     +model.inference.repetition_penalty=1.0 \
     model.inference.temperature=0.9 \
     model.inference.top_p=0.95 \
-    model.inference.max_tokens=2048 \
+    model.inference.max_tokens=4096 \
     +model.mode="test" \
-    data=MATHBench \
-    'data.datasets.MATHBench.splits.test.slice="[:10]"'
+    data=AIME \
+    'data.datasets.AIME.splits.train.slice="[:10]"'
 
 echo ""
-echo "  ✅ MATH 测试完成"
+echo "  ✅ AIME 测试完成"

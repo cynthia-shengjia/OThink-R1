@@ -15,8 +15,6 @@
 
 set -e
 
-conda deactivate 
-conda deactivate
 # ==================== 配置区 ====================
 CONDA_ENV_NAME="othink-r1"
 PYTHON_VERSION="3.11"
@@ -73,9 +71,10 @@ fi
 #   2. 根据 pyproject.toml 解析依赖
 #   3. 生成/更新 uv.lock 锁文件
 #   4. 安装所有依赖到 .venv
+
 uv sync
-uv pip install modelscope
-uv pip install huggingface_hub
+
+
 
 echo ""
 echo "=========================================="

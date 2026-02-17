@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
+eval "$(conda shell.bash hook)"
+conda activate othink-r1
 
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="${PROJECT_ROOT}/datasets"
 
 echo "=========================================="
