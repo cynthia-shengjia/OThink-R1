@@ -4,3 +4,4 @@ __pycache__/
 save_configs/
 log/
 uv.lock
+/baseline/deer/outputs
