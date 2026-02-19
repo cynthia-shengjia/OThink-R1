@@ -13,8 +13,8 @@ from datasets import load_dataset
 
 
 def _extract_boxed(solution: str) -> str:
-    """从 MATH solution 中提取 \\boxed{} 内容"""
-    match = re.search(r'\\boxed\{(.*)\}', solution, re.DOTALL)
+    """从 MATH solution 中提取 \boxed{} 内容"""
+    match = re.search(r'\boxed\{(.*)\}', solution, re.DOTALL)
     return match.group(1) if match else solution
 
 
