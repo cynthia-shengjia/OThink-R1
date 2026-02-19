@@ -5,3 +5,5 @@ save_configs/
 log/
 uv.lock
 /baseline/deer/outputs
+/baseline/cp-router/log/
+/baseline/cp-router/results/
