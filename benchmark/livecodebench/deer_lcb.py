@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 """
 LiveCodeBench DEER Early-Exit 评测 (deer_lcb.py)
-DEER: 迭代思考 + 置信度判断 + 提前退出
-
-用法:
-    cd ~/ACL-ARR-Jan-Rebuttal/OThink-R1
-    export PYTHONPATH="benchmark/livecodebench/LiveCodeBench:$PYTHONPATH"
-    conda run -n othink-r1 --no-banner uv run python benchmark/livecodebench/deer_lcb.py \
-        --model_path ./models/Qwen2.5-0.5B-Instruct \
-        --threshold 0.95 \
-        --max_problems 2 \
-        --max_model_len 4096
 """
 
 import os
@@ -18,45 +8,28 @@ import sys
 import json
 import time
 import argparse
-import re
 import math
-import torch
 import numpy as np
 
-# ── 安全常量 ──
 BACKTICK3 = chr(96) * 3
-THINK_OPEN_TAG = "<" + "think" + ">"
 THINK_CLOSE_TAG = "<" + "/" + "think" + ">"
 
-# ── 确保 LCB 源码在 path 中 ──
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LCB_ROOT = os.path.join(SCRIPT_DIR, "LiveCodeBench")
 if LCB_ROOT not in sys.path:
     sys.path.insert(0, LCB_ROOT)
 
 
-# ═══════════════════════════════════════════════════════
-#  1. 数据集加载
-# ═══════════════════════════════════════════════════════
-
 def load_problems(dataset_path, max_problems=0):
-    from lcb_runner.benchmarks.code_generation import (
-        CodeGenerationProblem,
-        load_code_generation_dataset,
-    )
+    from lcb_runner.benchmarks.code_generation import load_code_generation_dataset
     print(f"[INFO] 加载数据集: {dataset_path}")
     problems = load_code_generation_dataset(local_path=dataset_path)
     problems = sorted(problems, key=lambda x: x.question_id)
     if max_problems > 0:
         problems = problems[:max_problems]
-        print(f"[INFO] 限制为前 {max_problems} 题")
     print(f"[INFO] 共 {len(problems)} 题")
     return problems
 
-
-# ═══════════════════════════════════════════════════════
-#  2. Prompt 构建
-# ═══════════════════════════════════════════════════════
 
 SYSTEM_MESSAGE = (
     "You are an expert Python programmer. "
@@ -93,10 +66,6 @@ def build_prompt(problem):
     ]
 
 
-# ═══════════════════════════════════════════════════════
-#  3. 代码提取
-# ═══════════════════════════════════════════════════════
-
 def extract_code(model_output):
     text = model_output
     think_close = "<" + "/" + "think" + ">"
@@ -109,15 +78,7 @@ def extract_code(model_output):
     return "\n".join(lines[fence_indices[-2] + 1 : fence_indices[-1]])
 
 
-# ═══════════════════════════════════════════════════════
-#  4. DEER 核心: 置信度计算 + 迭代思考 + 提前退出
-# ═══════════════════════════════════════════════════════
-
 def compute_confidence(logprobs_list):
-    """
-    从 token logprobs 计算置信度。
-    使用平均 token 概率作为置信度指标。
-    """
     if not logprobs_list:
         return 0.0
     probs = [math.exp(lp) for lp in logprobs_list if lp is not None]
@@ -127,13 +88,11 @@ def compute_confidence(logprobs_list):
 
 
 def has_complete_code(text):
-    """检查输出是否包含完整的代码块"""
     think_close = "<" + "/" + "think" + ">"
     if think_close in text:
         after_think = text.split(think_close, 1)[1]
     else:
         after_think = text
-
     lines = after_think.split("\n")
     fence_indices = [i for i, line in enumerate(lines) if "```" in line]
     return len(fence_indices) >= 2
@@ -141,15 +100,6 @@ def has_complete_code(text):
 
 def deer_generate_single(llm, tokenizer, prompt_text, sampling_params,
                          threshold=0.95, max_rounds=5, extra_tokens=512):
-    """
-    DEER 单题生成:
-    1. 第一轮正常生成
-    2. 如果置信度 < threshold 且未达到 max_rounds，
-       将当前输出作为前缀继续生成（"继续思考"）
-    3. 一旦置信度 >= threshold 或检测到完整代码块，提前退出
-
-    返回: (final_output, rounds_used, confidence_history)
-    """
     from vllm import SamplingParams
 
     current_text = prompt_text
@@ -157,18 +107,15 @@ def deer_generate_single(llm, tokenizer, prompt_text, sampling_params,
     confidence_history = []
 
     for round_idx in range(max_rounds):
-        # 生成
         outputs = llm.generate([current_text], sampling_params)
         vllm_out = outputs[0].outputs[0]
         new_text = vllm_out.text
         accumulated_output += new_text
 
-        # 计算置信度
         logprobs = []
         if vllm_out.logprobs:
             for lp_dict in vllm_out.logprobs:
                 if lp_dict:
-                    # 取 top-1 的 logprob
                     top_token = max(lp_dict.values(), key=lambda x: x.logprob)
                     logprobs.append(top_token.logprob)
 
@@ -179,39 +126,25 @@ def deer_generate_single(llm, tokenizer, prompt_text, sampling_params,
               f"tokens={len(vllm_out.token_ids)}, "
               f"has_code={has_complete_code(accumulated_output)}")
 
-        # 提前退出条件
         if confidence >= threshold and has_complete_code(accumulated_output):
-            print(f"    → 提前退出 (conf >= {threshold})")
+            print(f"    -> Early exit (conf >= {threshold})")
             break
-
         if has_complete_code(accumulated_output) and round_idx >= 1:
-            # 已经有完整代码且不是第一轮，可以退出
-            print(f"    → 退出 (已有完整代码)")
+            print(f"    -> Exit (complete code found)")
             break
-
-        # 检查是否到达 EOS
         if vllm_out.finish_reason == "stop":
-            print(f"    → 模型自然停止")
+            print(f"    -> Natural stop")
             break
 
-        # 继续思考: 将当前输出拼接回去
         current_text = prompt_text + accumulated_output
-
-        # 后续轮次用较少的 token
         sampling_params = SamplingParams(
-            n=1,
-            max_tokens=extra_tokens,
+            n=1, max_tokens=extra_tokens,
             temperature=sampling_params.temperature,
-            top_p=sampling_params.top_p,
-            logprobs=1,
+            top_p=sampling_params.top_p, logprobs=1,
         )
 
     return accumulated_output, round_idx + 1, confidence_history
 
-
-# ═══════════════════════════════════════════════════════
-#  5. DEER 推理
-# ═══════════════════════════════════════════════════════
 
 def run_deer_inference(problems, model_path, threshold=0.95,
                        max_rounds=5, max_model_len=4096, max_tokens=4096):
@@ -219,61 +152,38 @@ def run_deer_inference(problems, model_path, threshold=0.95,
     from transformers import AutoTokenizer
 
     print(f"\n[INFO] 加载模型: {model_path}")
-    print(f"[INFO] DEER: threshold={threshold}, max_rounds={max_rounds}")
-
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-
     llm = LLM(
-        model=model_path,
-        tokenizer=model_path,
-        max_model_len=max_model_len,
-        trust_remote_code=True,
-        enforce_eager=True,
-        gpu_memory_utilization=0.90,
+        model=model_path, tokenizer=model_path,
+        max_model_len=max_model_len, trust_remote_code=True,
+        enforce_eager=True, gpu_memory_utilization=0.90,
     )
-
-    # 第一轮的 sampling params (带 logprobs)
     sampling_params = SamplingParams(
-        n=1,
-        max_tokens=max_tokens,
-        temperature=0.0,
-        top_p=1.0,
-        logprobs=1,  # 需要 logprobs 来计算置信度
+        n=1, max_tokens=max_tokens, temperature=0.0, top_p=1.0, logprobs=1,
     )
 
-    # 构建 prompts
     print("[INFO] 构建 prompts...")
     prompts = []
     for prob in problems:
         messages = build_prompt(prob)
         prompt_text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
+            messages, tokenize=False, add_generation_prompt=True,
         )
         prompts.append(prompt_text)
 
-    # DEER 逐题推理
     print(f"\n[INFO] DEER 推理 {len(prompts)} 个问题...")
     t0 = time.time()
     all_results = []
     total_rounds = 0
-    total_tokens = 0
 
     for i, (prob, prompt_text) in enumerate(zip(problems, prompts)):
         print(f"\n[{i+1}/{len(problems)}] {prob.question_title}")
-
         output, rounds, conf_hist = deer_generate_single(
             llm, tokenizer, prompt_text, sampling_params,
-            threshold=threshold,
-            max_rounds=max_rounds,
+            threshold=threshold, max_rounds=max_rounds,
         )
-
         code = extract_code(output)
         total_rounds += rounds
-        # 粗略估计 token 数
-        total_tokens += len(tokenizer.encode(output))
-
         all_results.append({
             "question_id": prob.question_id,
             "question_title": prob.question_title,
@@ -285,67 +195,42 @@ def run_deer_inference(problems, model_path, threshold=0.95,
 
     elapsed = time.time() - t0
     avg_rounds = total_rounds / len(problems) if problems else 0
-    print(f"\n[INFO] DEER 推理完成: {elapsed:.1f}s, "
-          f"avg_rounds={avg_rounds:.2f}, ~{total_tokens} tokens")
-
+    print(f"\n[INFO] DEER 完成: {elapsed:.1f}s, avg_rounds={avg_rounds:.2f}")
     return all_results
 
-
-# ═══════════════════════════════════════════════════════
-#  6. 评测
-# ═══════════════════════════════════════════════════════
 
 def run_evaluation(problems, all_results, num_process=12, timeout=6):
     from lcb_runner.evaluation.compute_code_generation_metrics import codegen_metrics
 
     print("\n" + "=" * 60)
-    print("  LiveCodeBench DEER 评测 (代码执行 + 判分)")
+    print("  LiveCodeBench DEER 评测")
     print("=" * 60)
 
     eval_samples = [prob.get_evaluation_sample() for prob in problems]
     generations = [r["code_list"] for r in all_results]
 
-    print(f"[INFO] 评测 {len(eval_samples)} 题...")
-
     t0 = time.time()
     metrics_result = codegen_metrics(
-        eval_samples,
-        generations,
-        num_process_evaluate=num_process,
-        timeout=timeout,
+        eval_samples, generations,
+        num_process_evaluate=num_process, timeout=timeout,
     )
     elapsed = time.time() - t0
-
     metrics = metrics_result[0]
-    results = metrics_result[1]
 
     print(f"\n[INFO] 评测完成: {elapsed:.1f}s")
-    print("=" * 60)
-    print("  DEER 评测结果")
-    print("=" * 60)
-
     for key, value in sorted(metrics.items()):
         if key == "detail":
             continue
         print(f"  {key}: {value:.4f}")
 
-    # DEER 特有统计
     rounds_list = [r["deer_rounds"] for r in all_results]
-    print(f"\n  DEER 统计:")
-    print(f"    平均轮数: {np.mean(rounds_list):.2f}")
-    print(f"    最大轮数: {max(rounds_list)}")
-    print(f"    1轮退出: {rounds_list.count(1)}/{len(rounds_list)}")
-
+    print(f"\n  DEER 统计: avg_rounds={np.mean(rounds_list):.2f}, "
+          f"1轮退出={rounds_list.count(1)}/{len(rounds_list)}")
     return metrics_result
 
 
-# ═══════════════════════════════════════════════════════
-#  7. 保存结果
-# ═══════════════════════════════════════════════════════
-
 def save_results(problems, all_results, metrics_result, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-
     output_path = os.path.join(output_dir, "deer_results.json")
     save_data = []
     for prob, res in zip(problems, all_results):
@@ -361,18 +246,11 @@ def save_results(problems, all_results, metrics_result, output_dir):
         })
     with open(output_path, "w") as f:
         json.dump(save_data, f, indent=2, ensure_ascii=False)
-    print(f"\n[INFO] DEER 结果已保存: {output_path}")
-
+    print(f"\n[INFO] 结果已保存: {output_path}")
     if metrics_result is not None:
-        metrics_path = os.path.join(output_dir, "metrics.json")
-        with open(metrics_path, "w") as f:
+        with open(os.path.join(output_dir, "metrics.json"), "w") as f:
             json.dump(metrics_result[0], f, indent=2)
-        print(f"[INFO] 评测指标已保存: {metrics_path}")
 
-
-# ═══════════════════════════════════════════════════════
-#  主函数
-# ═══════════════════════════════════════════════════════
 
 def main():
     parser = argparse.ArgumentParser(description="LiveCodeBench DEER 评测")
@@ -383,10 +261,8 @@ def main():
     parser.add_argument("--max_problems", type=int, default=0)
     parser.add_argument("--max_model_len", type=int, default=4096)
     parser.add_argument("--max_tokens", type=int, default=4096)
-    parser.add_argument("--threshold", type=float, default=0.95,
-                        help="DEER 置信度阈值")
-    parser.add_argument("--max_rounds", type=int, default=5,
-                        help="DEER 最大思考轮数")
+    parser.add_argument("--threshold", type=float, default=0.95)
+    parser.add_argument("--max_rounds", type=int, default=5)
     parser.add_argument("--num_process_evaluate", type=int, default=12)
     parser.add_argument("--timeout", type=int, default=6)
     parser.add_argument("--no_eval", action="store_true")
@@ -402,28 +278,20 @@ def main():
     print("=" * 60)
     print(f"  模型: {args.model_path}")
     print(f"  DEER: threshold={args.threshold}, max_rounds={args.max_rounds}")
-    print(f"  数据集: {args.dataset_path}")
-    print(f"  输出: {args.output_dir}")
     print("=" * 60)
 
     problems = load_problems(args.dataset_path, args.max_problems)
-
     all_results = run_deer_inference(
-        problems,
-        args.model_path,
-        threshold=args.threshold,
-        max_rounds=args.max_rounds,
-        max_model_len=args.max_model_len,
-        max_tokens=args.max_tokens,
+        problems, args.model_path,
+        threshold=args.threshold, max_rounds=args.max_rounds,
+        max_model_len=args.max_model_len, max_tokens=args.max_tokens,
     )
 
     metrics_result = None
     if not args.no_eval:
         metrics_result = run_evaluation(
-            problems,
-            all_results,
-            num_process=args.num_process_evaluate,
-            timeout=args.timeout,
+            problems, all_results,
+            num_process=args.num_process_evaluate, timeout=args.timeout,
         )
 
     save_results(problems, all_results, metrics_result, args.output_dir)
