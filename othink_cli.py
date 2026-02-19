@@ -411,12 +411,14 @@ def cmd_eval(args):
 # eval-deer — DEER 早退评测
 # ──────────────────────────────────────────────────────────────────────────────
 def cmd_eval_deer(args):
+    """DEER 早退评测 — 推理 + 评估 (生成 *_othink_eval.json)"""
     model_path = resolve_model(args.model)
     gpu_ids = parse_gpu_ids(args.gpu_ids)
     datasets = [d.lower() for d in args.datasets]
 
-    deer_run_sh = PROJECT_ROOT / "baseline" / "deer" / "scripts" / "run_deer.sh"
     deer_py = PROJECT_ROOT / "baseline" / "deer" / "vllm-deer.py"
+    eval_py = PROJECT_ROOT / "baseline" / "deer" / "scripts" / "eval_with_othink.py"
+    check_py = PROJECT_ROOT / "baseline" / "deer" / "check_fixed.py"
 
     if not deer_py.exists():
         Log.err(f"DEER 脚本不存在: {deer_py}")
@@ -435,46 +437,110 @@ def cmd_eval_deer(args):
             continue
 
         # 检查 DEER 数据是否存在
-        deer_data = PROJECT_ROOT / "baseline" / "deer" / "data" / deer_name / "test.jsonl"
-        if not deer_data.exists():
-            Log.warn(f"DEER 数据不存在: {deer_data}")
+        deer_data_dir = PROJECT_ROOT / "baseline" / "deer" / "data"
+        deer_data_file = deer_data_dir / deer_name / "test.jsonl"
+        if not deer_data_file.exists():
+            Log.warn(f"DEER 数据不存在: {deer_data_file}")
             Log.info(f"请先运行: python othink_cli.py download-data --datasets {ds}")
             continue
 
-        # 使用 run_deer.sh (它封装了推理+评估)
-        if deer_run_sh.exists():
-            cmd = [
-                "bash", str(deer_run_sh),
-                "--model", str(model_path),
-                "--dataset", deer_name,
-                "--threshold", str(args.threshold),
-                "--max_len", str(args.max_len),
-                "--gpu_ids", "",  # 由 CUDA_VISIBLE_DEVICES 控制
-            ]
-        else:
-            # 直接调用 vllm-deer.py
-            cmd = [
-                "uv", "run", "python", str(deer_py),
-                "--model_name_or_path", str(model_path),
-                "--dataset_dir", str(PROJECT_ROOT / "baseline" / "deer" / "data"),
-                "--dataset", deer_name,
-                "--threshold", str(args.threshold),
-                "--max-len", str(args.max_len),
-                "--think_ratio", "0.9",
-                "--temperature", "0.0",
-                "--top_p", "1.0",
-                "--policy", "avg1",
-                "--batch_size", "2000",
-                "--output_path", str(PROJECT_ROOT / "baseline" / "deer" / "outputs"),
-                "--no_thinking", "0",
-                "--rep", "0",
-                "--points", "1",
-                "--af", "0",
-                "--max_judge_steps", "10",
-                "--prob_check_max_tokens", "20",
-                "--run_time", "1",
-            ]
+        output_dir = PROJECT_ROOT / "baseline" / "deer" / "outputs"
+        model_basename = model_path.name  # e.g. Qwen2.5-0.5B-Instruct
+        threshold = args.threshold
+        max_len = args.max_len
 
+        # 构建输出文件名 (与 vllm-deer.py 生成的一致)
+        output_pattern = (
+            f"greedy_p{threshold}_ratio0.9_len{max_len}_"
+            f"temperature0.0_run_time1_no_thinking0_rep0_points1_policyavg1.jsonl"
+        )
+        expected_output = output_dir / model_basename / deer_name / output_pattern
+
+        # 构建 bash -c 串联命令: 推理 → 查找输出 → 评估
+        # 这样两步在同一个子进程中执行，共享 CUDA_VISIBLE_DEVICES
+        bash_script = f'''
+set -e
+
+echo "=========================================="
+echo "  DEER 推理: {deer_name}"
+echo "=========================================="
+
+cd "{PROJECT_ROOT}"
+
+# Step 1: 推理
+uv run python "{deer_py}" \\
+    --model_name_or_path "{model_path}" \\
+    --dataset_dir "{deer_data_dir}" \\
+    --dataset "{deer_name}" \\
+    --threshold {threshold} \\
+    --max-len {max_len} \\
+    --think_ratio 0.9 \\
+    --temperature 0.0 \\
+    --top_p 1.0 \\
+    --policy "avg1" \\
+    --batch_size 2000 \\
+    --output_path "{output_dir}" \\
+    --no_thinking 0 \\
+    --rep 0 \\
+    --points 1 \\
+    --af 0 \\
+    --max_judge_steps 10 \\
+    --prob_check_max_tokens 20 \\
+    --run_time 1
+
+echo ""
+echo "  ✅ DEER 推理完成"
+
+# Step 2: 查找输出文件
+OUTPUT_FILE=$(find "{output_dir}" -name "*.jsonl" -path "*{deer_name}*" 2>/dev/null | sort -t/ -k+1 | tail -1)
+
+if [ -z "$OUTPUT_FILE" ]; then
+    echo "  ⚠️  未找到输出文件"
+    exit 1
+fi
+
+echo "  输出文件: $OUTPUT_FILE"
+
+# Step 3: DEER 自带评估 (check_fixed.py)
+echo ""
+echo "=========================================="
+echo "  DEER 自带评估"
+echo "=========================================="
+'''
+
+        # check_fixed.py 需要原始数据集名 (不带 _hf 后缀的也行)
+        if check_py.exists():
+            bash_script += f'''
+cd "{PROJECT_ROOT}/baseline/deer"
+uv run python "{check_py}" \\
+    --model_name_or_path "{model_path}" \\
+    --data_name "{deer_name}" \\
+    --data_dir "{deer_data_dir}" \\
+    --generation_path "$OUTPUT_FILE" \\
+    2>&1 || echo "  ⚠️  DEER 自带评估失败 (不影响后续)"
+'''
+
+        # eval_with_othink.py 生成 *_othink_eval.json
+        if eval_py.exists():
+            bash_script += f'''
+# Step 4: OThink-R1 Verifier 评估 (生成 *_othink_eval.json)
+echo ""
+echo "=========================================="
+echo "  OThink-R1 Verifier 评估"
+echo "=========================================="
+cd "{PROJECT_ROOT}"
+uv run python "{eval_py}" \\
+    --generation_path "$OUTPUT_FILE" \\
+    --dataset "{ds}" \\
+    2>&1 || echo "  ⚠️  OThink-R1 评估失败"
+
+echo ""
+echo "=========================================="
+echo "  ✅ DEER 评测完成: {deer_name}"
+echo "=========================================="
+'''
+
+        cmd = ["bash", "-c", bash_script]
         tasks.append(TaskItem(name=f"deer-{ds}", cmd=cmd))
 
     if not tasks:
