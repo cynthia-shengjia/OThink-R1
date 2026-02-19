@@ -40,6 +40,12 @@ from core.fbe import select_optimal_alpha, compute_fbe
 from core.router import CPRouter
 
 
+def _infer_model_size(model_name: str) -> str:
+    """从模型名推断参数量: Qwen2.5-0.5B-Instruct → 0.5B"""
+    import re
+    m = re.search(r'(\d+\.?\d*B)', model_name, re.IGNORECASE)
+    return m.group(1) if m else "unknown"
+
 def parse_args():
     parser = argparse.ArgumentParser(description="CP-Router Test")
     parser.add_argument('--model_path', type=str, required=True,
@@ -344,8 +350,17 @@ def main():
     print(f"{'='*60}")
     
     # 保存结果
-    os.makedirs(f"{os.path.dirname(os.path.abspath(__file__))}/results", exist_ok=True)
-    result_file = f"{os.path.dirname(os.path.abspath(__file__))}/results/test_{args.dataset}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    model_basename = os.path.basename(os.path.normpath(args.model_path))
+    model_size = _infer_model_size(model_basename)
+    result_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "results", model_size, args.dataset,
+    )
+    os.makedirs(result_dir, exist_ok=True)
+    result_file = os.path.join(
+        result_dir,
+        f"test_{args.dataset}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+    )
     
     result_dict = {
         "dataset": args.dataset,
