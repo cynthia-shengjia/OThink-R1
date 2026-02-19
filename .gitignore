@@ -7,3 +7,4 @@ uv.lock
 /baseline/deer/outputs
 /baseline/cp-router/log/
 /baseline/cp-router/results/
+/benchmark/livecodebench/outputs
