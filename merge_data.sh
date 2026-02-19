@@ -1,3 +1,195 @@
+#!/bin/bash
+# ============================================================
+# setup_livecodebench.sh
+# 将 LiveCodeBench 整合到 OThink-R1 项目的 benchmark/ 目录下
+#
+# 使用方法:
+#   cd ~/ACL-ARR-Jan-Rebuttal/OThink-R1
+#   bash setup_livecodebench.sh [/path/to/local/LiveCodeBench]
+#
+# 参数:
+#   $1 (可选): 本地已 clone 的 LiveCodeBench 路径
+# ============================================================
+
+set -e
+
+PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+BENCHMARK_DIR="${PROJECT_ROOT}/benchmark/livecodebench"
+LCB_SRC_DIR="${BENCHMARK_DIR}/LiveCodeBench"
+
+echo "=========================================="
+echo "  LiveCodeBench → OThink-R1 整合"
+echo "  项目根目录: ${PROJECT_ROOT}"
+echo "=========================================="
+
+# ============================================================
+# Step 1: 创建 benchmark 目录结构 + 拷贝/clone LiveCodeBench
+# ============================================================
+
+echo ""
+echo "[1/6] 创建 benchmark/livecodebench/ 目录并导入 LiveCodeBench 源码..."
+
+mkdir -p "${BENCHMARK_DIR}"
+
+if [ -n "$1" ] && [ -d "$1" ]; then
+    echo "  使用本地 LiveCodeBench: $1"
+    if [ -d "${LCB_SRC_DIR}" ]; then
+        echo "  ⚠️  ${LCB_SRC_DIR} 已存在，跳过拷贝"
+    else
+        cp -r "$1" "${LCB_SRC_DIR}"
+        echo "  ✅ 已拷贝到 ${LCB_SRC_DIR}"
+    fi
+else
+    if [ -d "${LCB_SRC_DIR}" ]; then
+        echo "  ⚠️  ${LCB_SRC_DIR} 已存在，跳过 clone"
+    else
+        echo "  从 GitHub clone LiveCodeBench..."
+        git clone https://github.com/cynthia-shengjia/LiveCodeBench.git "${LCB_SRC_DIR}"
+        echo "  ✅ clone 完成"
+    fi
+fi
+
+# ============================================================
+# Step 2: 更新 pyproject.toml 添加 LiveCodeBench 依赖
+# ============================================================
+
+echo ""
+echo "[2/6] 检查并更新 pyproject.toml 依赖..."
+
+PYPROJECT="${PROJECT_ROOT}/pyproject.toml"
+DEPS_TO_ADD=("pebble>=5.1.0" "annotated-types>=0.7.0")
+
+for dep in "${DEPS_TO_ADD[@]}"; do
+    dep_name=$(echo "$dep" | sed 's/[>=<].*//')
+    if grep -qi "${dep_name}" "${PYPROJECT}"; then
+        echo "  ⚠️  ${dep_name} 已在 pyproject.toml 中"
+    else
+        if grep -q "# DEER Baseline Dependencies" "${PYPROJECT}"; then
+            sed -i "/# DEER Baseline Dependencies/i\\    \"${dep}\"," "${PYPROJECT}"
+        else
+            sed -i "/^]/i\\    \"${dep}\"," "${PYPROJECT}"
+        fi
+        echo "  ✅ 添加 ${dep}"
+    fi
+done
+
+echo "  ✅ 依赖更新完成"
+
+# ============================================================
+# Step 3: 创建标准评测入口脚本 run_lcb.sh
+# ============================================================
+
+echo ""
+echo "[3/6] 创建标准评测脚本 run_lcb.sh..."
+
+cat > "${BENCHMARK_DIR}/run_lcb.sh" << 'RUNEOF'
+#!/bin/bash
+# ============================================================
+# LiveCodeBench 标准评测入口
+# ============================================================
+
+set -e
+eval "$(conda shell.bash hook)"
+conda activate othink-r1
+
+MODEL=""
+MODEL_PATH=""
+GPU_IDS="0"
+MAX_TOKENS=16289
+TEMPERATURE=0.9
+CODEGEN_N=1
+N=1
+RELEASE_VERSION="release_v5"
+SCENARIO="codegeneration"
+STOP_WORDS="None"
+LOCAL_DATA_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --model) MODEL="$2"; shift 2;;
+        --model_path) MODEL_PATH="$2"; shift 2;;
+        --gpu_ids) GPU_IDS="$2"; shift 2;;
+        --max_tokens) MAX_TOKENS="$2"; shift 2;;
+        --temperature) TEMPERATURE="$2"; shift 2;;
+        --codegen_n) CODEGEN_N="$2"; shift 2;;
+        --n) N="$2"; shift 2;;
+        --release_version) RELEASE_VERSION="$2"; shift 2;;
+        --local_data) LOCAL_DATA_PATH="$2"; shift 2;;
+        *) echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+if [ -z "${MODEL}" ]; then
+    echo "❌ 请指定模型: --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LCB_DIR="${SCRIPT_DIR}/LiveCodeBench"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+if [ -n "${MODEL_PATH}" ] && [[ "${MODEL_PATH}" != /* ]]; then
+    MODEL_PATH="$(cd "$(dirname "${MODEL_PATH}")" && pwd)/$(basename "${MODEL_PATH}")"
+fi
+
+export CUDA_VISIBLE_DEVICES="${GPU_IDS}"
+
+echo "=========================================="
+echo "  LiveCodeBench 标准评测"
+echo "  模型: ${MODEL}"
+echo "  GPU: ${GPU_IDS}"
+echo "=========================================="
+
+LCB_ARGS=(
+    --model "${MODEL}"
+    --scenario "${SCENARIO}"
+    --max_tokens "${MAX_TOKENS}"
+    --release_version "${RELEASE_VERSION}"
+    --evaluate
+    --codegen_n "${CODEGEN_N}"
+    --n "${N}"
+    --temperature "${TEMPERATURE}"
+    --stop "${STOP_WORDS}"
+)
+
+if [ -n "${MODEL_PATH}" ]; then
+    LCB_ARGS+=(--local_model_path "${MODEL_PATH}")
+fi
+
+if [ -n "${LOCAL_DATA_PATH}" ]; then
+    LCB_ARGS+=(--local_dataset_path "${LOCAL_DATA_PATH}")
+elif [ -d "${PROJECT_ROOT}/datasets/livecodebench/code_generation_lite" ]; then
+    LCB_ARGS+=(--local_dataset_path "${PROJECT_ROOT}/datasets/livecodebench/code_generation_lite")
+fi
+
+cd "${PROJECT_ROOT}"
+export PYTHONPATH="${LCB_DIR}:${PYTHONPATH}"
+uv run python -m lcb_runner.runner.main "${LCB_ARGS[@]}"
+
+MODEL_NAME=$(basename "${MODEL}")
+OUTPUT_FILE="${LCB_DIR}/output/${MODEL_NAME}/Scenario.${SCENARIO}_${CODEGEN_N}_${TEMPERATURE}.json"
+
+if [ -f "${OUTPUT_FILE}" ]; then
+    echo "  ✅ 评测完成！结果: ${OUTPUT_FILE}"
+    uv run python -m lcb_runner.utils.get_length_lcb \
+        --model_name "${MODEL}" \
+        --file_path "${OUTPUT_FILE}" \
+        2>/dev/null || echo "  ⚠️  token 统计失败"
+else
+    echo "  ⚠️  未找到输出文件: ${OUTPUT_FILE}"
+fi
+RUNEOF
+chmod +x "${BENCHMARK_DIR}/run_lcb.sh"
+echo "  ✅ run_lcb.sh 创建完成"
+
+# ============================================================
+# Step 4: 创建 DEER 适配脚本 deer_lcb.py
+# ============================================================
+
+echo ""
+echo "[4/6] 创建 DEER 适配脚本 deer_lcb.py..."
+
+cat > "${BENCHMARK_DIR}/deer_lcb.py" << 'DEEREOF'
 """
 DEER (Dynamic Early Exit for Reasoning) 适配 LiveCodeBench 代码生成任务
 
@@ -494,3 +686,170 @@ def main():
 
 if __name__ == "__main__":
     main()
+DEEREOF
+echo "  ✅ deer_lcb.py 创建完成"
+
+# ============================================================
+# Step 5: 创建 CP-Router stub
+# ============================================================
+
+echo ""
+echo "[5/6] 创建 CP-Router stub..."
+
+cat > "${BENCHMARK_DIR}/cp_router_lcb_stub.py" << 'CPEOF'
+"""
+CP-Router x LiveCodeBench Stub
+
+CP-Router 不适用于代码生成任务:
+1. 代码生成是开放式生成任务，没有固定选项集合
+2. 无法计算选项级别的 nonconformity scores
+3. 无法构建有意义的预测集
+"""
+import sys
+
+def main():
+    print("=" * 60)
+    print("  CP-Router x LiveCodeBench")
+    print("=" * 60)
+    print()
+    print("  CP-Router 不适用于代码生成任务")
+    print()
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
+CPEOF
+echo "  ✅ cp_router_lcb_stub.py 创建完成"
+
+# ============================================================
+# Step 6: 创建运行脚本 + 数据下载脚本 + README
+# ============================================================
+
+echo ""
+echo "[6/6] 创建运行脚本和 README..."
+
+cat > "${BENCHMARK_DIR}/run_deer_lcb.sh" << 'DEERSHEOF'
+#!/bin/bash
+# ============================================================
+# DEER x LiveCodeBench 运行脚本
+# ============================================================
+
+set -e
+eval "$(conda shell.bash hook)"
+conda activate othink-r1
+
+MODEL_PATH=""
+GPU_IDS="0"
+THRESHOLD=0.95
+MAX_LEN=16384
+THINK_RATIO=0.87
+POLICY="avg1"
+TEMPERATURE=0.0
+MAX_SAMPLES=""
+LOCAL_DATA=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --model) MODEL_PATH="$2"; shift 2;;
+        --gpu_ids) GPU_IDS="$2"; shift 2;;
+        --threshold) THRESHOLD="$2"; shift 2;;
+        --max_len) MAX_LEN="$2"; shift 2;;
+        --think_ratio) THINK_RATIO="$2"; shift 2;;
+        --policy) POLICY="$2"; shift 2;;
+        --temperature) TEMPERATURE="$2"; shift 2;;
+        --max_samples) MAX_SAMPLES="$2"; shift 2;;
+        --local_data) LOCAL_DATA="$2"; shift 2;;
+        *) echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+if [ -z "${MODEL_PATH}" ]; then
+    echo "请指定模型路径: --model /path/to/model"
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+if [[ "${MODEL_PATH}" != /* ]]; then
+    MODEL_PATH="$(cd "$(dirname "${MODEL_PATH}")" && pwd)/$(basename "${MODEL_PATH}")"
+fi
+
+DEER_ARGS=(
+    --model_name_or_path "${MODEL_PATH}"
+    --threshold "${THRESHOLD}"
+    --max_len "${MAX_LEN}"
+    --think_ratio "${THINK_RATIO}"
+    --policy "${POLICY}"
+    --temperature "${TEMPERATURE}"
+    --gpu_ids "${GPU_IDS}"
+)
+
+if [ -n "${LOCAL_DATA}" ]; then
+    DEER_ARGS+=(--dataset_path "${LOCAL_DATA}")
+elif [ -d "${PROJECT_ROOT}/datasets/livecodebench/code_generation_lite" ]; then
+    DEER_ARGS+=(--dataset_path "${PROJECT_ROOT}/datasets/livecodebench/code_generation_lite")
+fi
+
+if [ -n "${MAX_SAMPLES}" ]; then
+    DEER_ARGS+=(--max_samples "${MAX_SAMPLES}")
+fi
+
+cd "${PROJECT_ROOT}"
+export PYTHONPATH="${SCRIPT_DIR}/LiveCodeBench:${PYTHONPATH}"
+uv run python "${SCRIPT_DIR}/deer_lcb.py" "${DEER_ARGS[@]}"
+DEERSHEOF
+chmod +x "${BENCHMARK_DIR}/run_deer_lcb.sh"
+
+cat > "${BENCHMARK_DIR}/download_data.sh" << 'DLEOF'
+#!/bin/bash
+# 下载 LiveCodeBench 数据集
+set -e
+eval "$(conda shell.bash hook)"
+conda activate othink-r1
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+DATA_DIR="${PROJECT_ROOT}/datasets/livecodebench/code_generation_lite"
+
+export HF_ENDPOINT=https://hf-mirror.com
+
+if [ -d "${DATA_DIR}" ] && [ "$(ls -A ${DATA_DIR} 2>/dev/null)" ]; then
+    echo "  数据集已存在: ${DATA_DIR}"
+else
+    echo "  下载 LiveCodeBench 数据集..."
+    mkdir -p "${DATA_DIR}"
+    uv run huggingface-cli download \
+        --repo-type dataset \
+        livecodebench/code_generation_lite \
+        --local-dir "${DATA_DIR}" \
+        --local-dir-use-symlinks False \
+        --resume-download
+    echo "  下载完成: ${DATA_DIR}"
+fi
+DLEOF
+chmod +x "${BENCHMARK_DIR}/download_data.sh"
+
+cat > "${BENCHMARK_DIR}/README.md" << 'READMEEOF'
+# LiveCodeBench Benchmark for OThink-R1
+
+支持标准评测和 DEER early-exit 适配。
+
+## 快速开始
+
+1. 下载数据集: bash benchmark/livecodebench/download_data.sh
+2. 标准评测: bash benchmark/livecodebench/run_lcb.sh --model NAME --model_path PATH
+3. DEER 评测: bash benchmark/livecodebench/run_deer_lcb.sh --model PATH --threshold 0.95
+READMEEOF
+
+echo "  ✅ 运行脚本和 README 创建完成"
+
+echo ""
+echo "=========================================="
+echo "  ✅ 整合完成!"
+echo "=========================================="
+echo ""
+echo "  后续步骤:"
+echo "    1. bash benchmark/livecodebench/download_data.sh"
+echo "    2. bash benchmark/livecodebench/run_lcb.sh --model <model_name>"
+echo "    3. bash benchmark/livecodebench/run_deer_lcb.sh --model <model_path>"
+echo ""

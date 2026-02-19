@@ -1,13 +1,8 @@
 #!/bin/bash
 # ============================================================
-# DEER × LiveCodeBench 运行脚本
-#
-# 用法:
-#   bash benchmark/livecodebench/run_deer_lcb.sh \
-#       --model /path/to/model \
-#       --gpu_ids 0 \
-#       --threshold 0.95
+# DEER x LiveCodeBench 运行脚本
 # ============================================================
+
 set -e
 eval "$(conda shell.bash hook)"
 conda activate othink-r1
@@ -38,14 +33,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "${MODEL_PATH}" ]; then
-    echo "❌ 请指定模型路径: --model /path/to/model"
+    echo "请指定模型路径: --model /path/to/model"
     exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# 解析相对路径
 if [[ "${MODEL_PATH}" != /* ]]; then
     MODEL_PATH="$(cd "$(dirname "${MODEL_PATH}")" && pwd)/$(basename "${MODEL_PATH}")"
 fi
@@ -60,7 +54,6 @@ DEER_ARGS=(
     --gpu_ids "${GPU_IDS}"
 )
 
-# 数据集路径
 if [ -n "${LOCAL_DATA}" ]; then
     DEER_ARGS+=(--dataset_path "${LOCAL_DATA}")
 elif [ -d "${PROJECT_ROOT}/datasets/livecodebench/code_generation_lite" ]; then
@@ -72,4 +65,5 @@ if [ -n "${MAX_SAMPLES}" ]; then
 fi
 
 cd "${PROJECT_ROOT}"
+export PYTHONPATH="${SCRIPT_DIR}/LiveCodeBench:${PYTHONPATH}"
 uv run python "${SCRIPT_DIR}/deer_lcb.py" "${DEER_ARGS[@]}"
