@@ -203,6 +203,7 @@ python othink_cli.py eval-lcb \
     --model Qwen2.5-0.5B-Instruct \
     --mode standard \
     --gpu_ids 0
+    --max_problems 2
 
 # DEER 模式
 python othink_cli.py eval-lcb \
