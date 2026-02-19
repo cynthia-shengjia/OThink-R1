@@ -8,3 +8,4 @@ uv.lock
 /baseline/cp-router/log/
 /baseline/cp-router/results/
 /benchmark/livecodebench/outputs
+/results/
