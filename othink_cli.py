@@ -70,6 +70,20 @@ DATASET_REGISTRY = {
         "deer_name": "gpqa",
         "standard_name": None,
     },
+    
+    "openbookqa": {
+    "repo": "allenai/openbookqa",
+    "local": "datasets/OpenBookQA",
+    "deer_name": None,
+    "standard_name": "OpenBookQA",
+    },
+    
+    "commonsenseqa": {
+        "repo": "tau/commonsense_qa",
+        "local": "datasets/CommonsenseQA",
+        "deer_name": None,
+        "standard_name": "CommonsenseQA",
+    }
 }
 
 DEER_CONVERTIBLE = {"math", "aime", "asdiv"}  # convert_hf_to_deer.py 支持的

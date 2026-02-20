@@ -18,5 +18,5 @@ data:
           slice: "[:100%]"
           columns_to_remove: []
       verify: "choice_selecting"
-      subset: "main"
+      subset: 
       eval_split: "test"
