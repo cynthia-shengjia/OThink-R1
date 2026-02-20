@@ -61,7 +61,7 @@ DATASET_REGISTRY = {
     "gsm8k": {
         "repo": "openai/gsm8k",
         "local": "datasets/GSM8K",
-        "deer_name": "gsm8k",
+        "deer_name": "gsm8k_hf",
         "standard_name": "GSM8K",
     },
     "gpqa": {
@@ -74,19 +74,19 @@ DATASET_REGISTRY = {
     "openbookqa": {
     "repo": "allenai/openbookqa",
     "local": "datasets/OpenBookQA",
-    "deer_name": None,
+    "deer_name": "openbookqa_hf",
     "standard_name": "OpenBookQA",
     },
     
     "commonsenseqa": {
         "repo": "tau/commonsense_qa",
         "local": "datasets/CommonsenseQA",
-        "deer_name": None,
+        "deer_name": "commonsenseqa_hf",
         "standard_name": "CommonsenseQA",
     }
 }
 
-DEER_CONVERTIBLE = {"math", "aime", "asdiv"}  # convert_hf_to_deer.py 支持的
+DEER_CONVERTIBLE = {"math", "aime", "asdiv", "gsm8k", "commonsenseqa", "openbookqa"}  # convert_hf_to_deer.py 支持的
 
 DEFAULT_HF_MIRROR = "https://hf-mirror.com"
 

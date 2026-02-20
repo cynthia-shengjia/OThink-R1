@@ -77,6 +77,81 @@ def convert_asdiv(hf_dir, output_dir):
             }, ensure_ascii=False) + '\n')
             count += 1
     print(f"  ✅ ASDIV (validation作为test): {count} 条 → {out_path}")
+
+
+def convert_gsm8k(hf_dir, output_dir):
+    """GSM8K (openai/gsm8k) - test split"""
+    gsm8k_dir = os.path.join(hf_dir, "GSM8K")
+    out_dir = os.path.join(output_dir, "gsm8k_hf")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "test.jsonl")
+
+    dataset = load_dataset(gsm8k_dir, "main", split="test")
+    count = 0
+    with open(out_path, 'w', encoding='utf-8') as f:
+        for item in dataset:
+            problem = item['question']
+            # answer 格式: "...\n#### 123"
+            raw_answer = item['answer']
+            match = re.search(r'####\s*(.*)', raw_answer)
+            answer = match.group(1).strip() if match else raw_answer
+            f.write(json.dumps({
+                "problem": problem,
+                "answer": answer
+            }, ensure_ascii=False) + '\n')
+            count += 1
+    print(f"  ✅ GSM8K (test): {count} 条 → {out_path}")
+
+def convert_commonsenseqa(hf_dir, output_dir):
+    """CommonsenseQA (tau/commonsense_qa) - 多选题, validation 作为 test"""
+    csqa_dir = os.path.join(hf_dir, "CommonsenseQA")
+    out_dir = os.path.join(output_dir, "commonsenseqa_hf")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "test.jsonl")
+
+    # CommonsenseQA 的 test split 没有标签, 用 validation
+    dataset = load_dataset(csqa_dir, split="validation")
+    count = 0
+    with open(out_path, 'w', encoding='utf-8') as f:
+        for item in dataset:
+            choices = item['choices']
+            labels = choices['label']
+            texts = choices['text']
+            options_str = "\n".join([f"{l}. {t}" for l, t in zip(labels, texts)])
+            problem = f"{item['question']}\n{options_str}"
+            answer = item['answerKey']
+            f.write(json.dumps({
+                "problem": problem,
+                "answer": answer
+            }, ensure_ascii=False) + '\n')
+            count += 1
+    print(f"  ✅ CommonsenseQA (validation→test): {count} 条 → {out_path}")
+
+
+def convert_openbookqa(hf_dir, output_dir):
+    """OpenBookQA (allenai/openbookqa) - 多选题, test split"""
+    obqa_dir = os.path.join(hf_dir, "OpenBookQA")
+    out_dir = os.path.join(output_dir, "openbookqa_hf")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "test.jsonl")
+
+    dataset = load_dataset(obqa_dir, "main", split="test")
+    count = 0
+    with open(out_path, 'w', encoding='utf-8') as f:
+        for item in dataset:
+            choices = item['choices']
+            labels = choices['label']
+            texts = choices['text']
+            options_str = "\n".join([f"{l}. {t}" for l, t in zip(labels, texts)])
+            problem = f"{item['question_stem']}\n{options_str}"
+            answer = item['answerKey']
+            f.write(json.dumps({
+                "problem": problem,
+                "answer": answer
+            }, ensure_ascii=False) + '\n')
+            count += 1
+    print(f"  ✅ OpenBookQA (test): {count} 条 → {out_path}")
+
 def convert_custom(jsonl_path, output_dir, name):
     """
     通用转换：任意 jsonl 文件。
@@ -106,7 +181,7 @@ def main():
     parser.add_argument('--hf_dir', type=str, default='../../datasets')
     parser.add_argument('--output_dir', type=str, default='./data')
     parser.add_argument('--dataset', type=str, default='all',
-                        choices=['math', 'aime', 'asdiv', 'all', 'custom'])
+                        choices=['math', 'aime', 'asdiv', 'gsm8k', 'commonsenseqa', 'openbookqa', 'all', 'custom'])
     parser.add_argument('--custom_jsonl', type=str, default=None)
     parser.add_argument('--custom_name', type=str, default='custom')
     args = parser.parse_args()
@@ -118,6 +193,9 @@ def main():
         'math': lambda: convert_math(hf_dir, args.output_dir),
         'aime': lambda: convert_aime(hf_dir, args.output_dir),
         'asdiv': lambda: convert_asdiv(hf_dir, args.output_dir),
+        'gsm8k': lambda: convert_gsm8k(hf_dir, args.output_dir),
+        'commonsenseqa': lambda: convert_commonsenseqa(hf_dir, args.output_dir),
+        'openbookqa': lambda: convert_openbookqa(hf_dir, args.output_dir),
     }
     if args.dataset == 'custom':
         if not args.custom_jsonl:

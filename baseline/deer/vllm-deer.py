@@ -252,6 +252,8 @@ def main():
     answer_prompt_str = "\n**Final Answer**\n\\boxed" # Prompt string to guide answer generation
     if 'gpqa' in args.dataset:
         answer_prompt_str = "\n**Final Answer**\nI believe the final answer, rather than the option, is \\boxed"
+    if 'commonsenseqa' in args.dataset or 'openbookqa' in args.dataset:
+        answer_prompt_str = "\n**Final Answer**\nThe correct option is \\boxed"
 
     # Get token IDs for stop conditions and strings to append
     last_token_ids = []
