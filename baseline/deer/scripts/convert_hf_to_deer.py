@@ -12,7 +12,7 @@ import argparse
 import re
 from datasets import load_dataset
 def convert_math(hf_dir, output_dir):
-    """MATH (DigitalLearningGmbH/MATH-lighteval) - 只取 test"""
+    """MATH-500 (ricdomolm/MATH-500) - 只有 test split"""
     math_dir = os.path.join(hf_dir, "MATH")
     data_sub = os.path.join(math_dir, "data")
     src = data_sub if os.path.isdir(data_sub) else math_dir
@@ -23,15 +23,19 @@ def convert_math(hf_dir, output_dir):
     count = 0
     with open(out_path, 'w', encoding='utf-8') as f:
         for item in dataset:
-            solution = item['solution']
-            match = re.search(r'\\boxed\{(.*)\}', solution, re.DOTALL)
-            answer = match.group(1) if match else solution
+            # MATH-500 直接提供 answer 字段，无需从 solution 中提取
+            answer = item.get('answer', '')
+            if not answer and 'solution' in item:
+                solution = item['solution']
+                match = re.search(r'\boxed\{(.*)\}', solution, re.DOTALL)
+                answer = match.group(1) if match else solution
             f.write(json.dumps({
                 "problem": item['problem'],
-                "answer": answer
+                "answer": str(item['answer']).strip()
             }, ensure_ascii=False) + '\n')
             count += 1
-    print(f"  ✅ MATH (test): {count} 条 → {out_path}")
+    print(f"  ✅ MATH-500 (test): {count} 条 → {out_path}")
+
 def convert_aime(hf_dir, output_dir):
     """
     AIME (AI-MO/aimo-validation-aime)

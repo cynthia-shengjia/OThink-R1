@@ -35,7 +35,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # 数据集注册表: key → { repo, local_dir, deer_name, standard_hydra_name }
 DATASET_REGISTRY = {
     "math": {
-        "repo": "DigitalLearningGmbH/MATH-lighteval",
+        "repo": "ricdomolm/MATH-500",
         "local": "datasets/MATH",
         "deer_name": "math_hf",           # DEER 格式数据集名 (在 baseline/deer/data/ 下)
         "standard_name": "MATHBench",      # OThinkR1Training Hydra 配置名

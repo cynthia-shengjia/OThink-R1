@@ -22,12 +22,12 @@ project_root: auto
 # ---------------------------------------------------------------------------
 datasets:
   math:
-    hf_repo: DigitalLearningGmbH/MATH-lighteval
+    hf_repo: ricdomolm/MATH-500
     repo_type: dataset
     local_dir: datasets/MATH
     deer_name: math_hf
     standard_name: MATHBench
-    description: "MATH benchmark, 7个难度等级的数学竞赛题"
+    description: "MATH-500: 500道精选数学竞赛题子集"
 
   aime:
     hf_repo: AI-MO/aimo-validation-aime

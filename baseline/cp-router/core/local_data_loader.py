@@ -22,28 +22,28 @@ def load_math_as_mcqa(
     seed: int = 42
 ) -> Dict:
     """
-    加载 MATH 数据集并转换为 MCQA 格式
-    
-    策略: 对每道题, 用正确答案 + 3个干扰项构成4个选项
-    干扰项从同数据集其他题目的答案中随机抽取
+    加载 MATH-500 数据集 (ricdomolm/MATH-500) 并转换为 MCQA 格式
+    MATH-500 字段: problem, answer (直接提供答案，无需从 solution 提取)
     """
-    print(f"  Loading MATH from {data_dir}...")
+    print(f"  Loading MATH-500 from {data_dir}...")
     dataset = load_dataset(data_dir, split="test")
     
     random.seed(seed)
     
-    # 提取所有答案作为干扰项池
     all_answers = []
     problems = []
     for item in dataset:
-        answer = _extract_boxed(item['solution'])
-        all_answers.append(answer)
+        # MATH-500 直接有 answer 字段
+        answer = item.get('answer', '')
+        if not answer and 'solution' in item:
+            answer = _extract_boxed(item['solution'])
+        all_answers.append(str(answer).strip())
         problems.append({
             "question": item['problem'],
-            "answer": answer
-        })
+            "answer": str(answer).strip()
+        } + '
+')
     
-    # 随机采样
     if max_samples and max_samples < len(problems):
         indices = random.sample(range(len(problems)), max_samples)
         problems = [problems[i] for i in indices]
@@ -54,15 +54,12 @@ def load_math_as_mcqa(
     
     for prob in problems:
         correct = prob["answer"]
-        
-        # 生成干扰项: 从答案池中随机选3个不同的
         distractors = [a for a in all_answers if a != correct]
         if len(distractors) >= 3:
             distractors = random.sample(distractors, 3)
         else:
             distractors = distractors + [f"None of the above"] * (3 - len(distractors))
         
-        # 随机放置正确答案
         options = distractors + [correct]
         random.shuffle(options)
         correct_idx = options.index(correct)
@@ -71,12 +68,12 @@ def load_math_as_mcqa(
         options_list.append(options)
         labels.append(correct_idx)
     
-    print(f"  ✅ Loaded {len(questions)} MATH problems as MCQA")
+    print(f"  ✅ Loaded {len(questions)} MATH-500 problems as MCQA")
     return {
         "questions": questions,
         "options": options_list,
         "labels": np.array(labels),
-        "name": "MATH",
+        "name": "MATH-500",
         "num_choices": 4
     }
 
