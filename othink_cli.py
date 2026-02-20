@@ -591,6 +591,7 @@ def cmd_eval_cp_router(args):
             "--batch_size", str(args.batch_size),
             "--tau", str(args.tau),
             "--beta", str(args.beta),
+            "--cal_ratio", str(args.cal_ratio),
         ]
         if args.skip_lrm:
             cmd.append("--skip_lrm")
@@ -941,6 +942,7 @@ def build_parser():
     ec.add_argument("--beta", type=float, default=3.0)
     ec.add_argument("--max_samples", type=int, default=0, help="0=全部")
     ec.add_argument("--batch_size", type=int, default=8)
+    ec.add_argument("--cal_ratio", type=float, default=0.3, help="校准集比例 (默认 0.3)")
     ec.add_argument("--skip_lrm", action="store_true", help="跳过 LRM 推理")
     ec.add_argument("--lrm_max_tokens", type=int, default=512)
     ec.set_defaults(func=cmd_eval_cp_router)

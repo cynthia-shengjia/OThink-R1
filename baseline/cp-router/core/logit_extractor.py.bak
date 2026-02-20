@@ -29,7 +29,7 @@ class LogitExtractor:
             option_tokens: 选项 token 列表, 默认 ['A', 'B', 'C', 'D']
         """
         self.model_path = model_path
-        self.option_tokens = option_tokens or ['A', 'B', 'C', 'D', 'E']
+        self.option_tokens = option_tokens or ['A', 'B', 'C', 'D']
         
         print(f"  Loading model: {model_path}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)

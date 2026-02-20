@@ -53,7 +53,7 @@ def parse_args():
     parser.add_argument('--datasets_dir', type=str, required=True,
                         help="数据集根目录 (包含 MATH/, AIME/, ASDIV/)")
     parser.add_argument('--dataset', type=str, default='math',
-                        choices=['math', 'aime', 'asdiv', 'gsm8k', 'commonsenseqa', 'openbookqa'],
+                        choices=['math', 'aime', 'asdiv'],
                         help="测试数据集")
     parser.add_argument('--max_samples', type=int, default=30,
                         help="最大样本数 (测试阶段用少量)")
@@ -114,7 +114,7 @@ def run_lrm_inference(model_path, prompts, max_tokens=512):
     outputs = llm_engine.generate(formatted, sampling_params, use_tqdm=True)
     
     results = []
-    option_map = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4}
+    option_map = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
     
     for output in outputs:
         text = output.outputs[0].text
@@ -124,9 +124,9 @@ def run_lrm_inference(model_path, prompts, max_tokens=512):
         answer_idx = -1
         # 尝试多种模式
         for pattern in [
-            r'\b([A-E])\b',
-            r'([A-E])\.',
-            r'answer\s*(?:is|:)\s*([A-E])',
+            r'\b([A-D])\b',
+            r'([A-D])\.',
+            r'answer\s*(?:is|:)\s*([A-D])',
         ]:
             matches = re.findall(pattern, text, re.IGNORECASE)
             if matches:
