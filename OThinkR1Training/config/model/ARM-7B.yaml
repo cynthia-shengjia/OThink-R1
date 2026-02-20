@@ -2,12 +2,14 @@
 model:
   name: ARM-7B
   model_size: 7B
-  path: ../models/ARM-7B
+  mode: eval
+  path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/models/ARM-7B
   inference:
-    tensor_parallel_size: 1
+    tensor_parallel_size: 4
     enable_prefix_caching: True
-    gpu_memory_utilization: 0.9
-    temperature: 0.9
+    gpu_memory_utilization: 0.95
+    temperature: 0.6
     top_p: 0.95
-    max_tokens: 4096
+    max_tokens: 16384
     skip_special_tokens: True
+    repetition_penalty: 1.0

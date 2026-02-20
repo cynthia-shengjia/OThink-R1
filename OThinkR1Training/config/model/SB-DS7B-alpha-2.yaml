@@ -1,9 +1,9 @@
 # @package _global_
 model:
-  name: DeepSeek-R1-Distill-Qwen-7B-Fix
+  name: SB-DS7B-alpha-2
   model_size: 7B
   mode: eval
-  path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/models/DeepSeek-R1-Distill-Qwen-7B-fixed
+  path: /home/zsj/ACL-ARR-Jan-Rebuttal/OThink-R1/models/SB_DS7B_alpha_2
   inference:
     tensor_parallel_size: 4
     enable_prefix_caching: True
