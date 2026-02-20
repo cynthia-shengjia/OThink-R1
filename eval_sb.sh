@@ -1,34 +1,32 @@
 #!/bin/bash
-# =============================================================
-# SB-DS7B-alpha-2: 标准测评 (6数据集) + LiveCodeBench
-# =============================================================
 set -e
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
-export HF_HUB_OFFLINE=1
-export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-MODEL_PATH="${ROOT}/models/SB_DS7B_alpha_2"
+echo "========== SB-DS7B-alpha-2: Standard =========="
 
-echo "=============================================="
-echo "  SB-DS7B-alpha-2 Evaluation"
-echo "=============================================="
+echo ">>> SB: AIME"
+python othink_cli.py eval --model SB_DS7B_alpha_2 --datasets aime --gpu_ids 0
 
-# --- 标准测评 ---
-echo ""
-echo "========== [1/2] Standard Eval × 6 datasets =========="
-cd "${ROOT}/OThinkR1Training"
-python eval_all.py --model SB-DS7B-alpha-2 --dataset all --tp 4 --gpu_util 0.95
+echo ">>> SB: MATHBench"
+python othink_cli.py eval --model SB_DS7B_alpha_2 --datasets math --gpu_ids 0
 
-# --- LiveCodeBench ---
-echo ""
-echo "========== [2/2] LiveCodeBench =========="
-cd "$ROOT"
-bash benchmark/livecodebench/run_standard.sh \
-    --model_path "${MODEL_PATH}" \
-    --gpu_ids 0,1,2,3 \
-    --max_model_len 16384 \
-    --max_tokens 16384
+echo ">>> SB: GSM8K"
+python othink_cli.py eval --model SB_DS7B_alpha_2 --datasets gsm8k --gpu_ids 0
 
-echo ""
-echo "✅ SB-DS7B-alpha-2 all done!"
+echo ">>> SB: ASDIV"
+python othink_cli.py eval --model SB_DS7B_alpha_2 --datasets asdiv --gpu_ids 0
+
+echo ">>> SB: CommonsenseQA"
+python othink_cli.py eval --model SB_DS7B_alpha_2 --datasets commonsenseqa --gpu_ids 0
+
+echo ">>> SB: OpenBookQA"
+python othink_cli.py eval --model SB_DS7B_alpha_2 --datasets openbookqa --gpu_ids 0
+
+echo "========== SB: LiveCodeBench =========="
+
+echo ">>> SB: LCB Standard"
+python othink_cli.py eval-lcb --model SB_DS7B_alpha_2 --mode standard --gpu_ids 0
+
+echo ">>> SB: LCB DEER"
+python othink_cli.py eval-lcb --model SB_DS7B_alpha_2 --mode deer --gpu_ids 0
+
+echo "✅ SB 全部完成"
