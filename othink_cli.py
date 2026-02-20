@@ -62,7 +62,7 @@ DATASET_REGISTRY = {
         "repo": "openai/gsm8k",
         "local": "datasets/GSM8K",
         "deer_name": "gsm8k",
-        "standard_name": None,
+        "standard_name": "GSM8K",
     },
     "gpqa": {
         "repo": "Idavidrein/gpqa",

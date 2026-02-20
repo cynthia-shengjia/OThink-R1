@@ -3,7 +3,7 @@ data:
   datasets:
     OpenBookQA:
       _target_: core.dataset_processor.OpenBookQAProcessor
-      path: Your/OpenBookQA/Data/Path
+      path: ../datasets/OpenBookQA
       splits:
         train:
           name: train
@@ -18,5 +18,5 @@ data:
           slice: "[:100%]"
           columns_to_remove: []
       verify: "choice_selecting"
-      subset: 
+      subset: "main"
       eval_split: "test"

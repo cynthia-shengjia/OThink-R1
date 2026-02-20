@@ -3,7 +3,7 @@ data:
   datasets:
     GSM8K:
       _target_: core.dataset_processor.GSM8KProcessor
-      path: Your/GSM8K/Data/Path
+      path: ../datasets/GSM8K
       splits:
         train:
           name: train

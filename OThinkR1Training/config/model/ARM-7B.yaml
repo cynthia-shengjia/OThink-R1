@@ -1,0 +1,13 @@
+# @package _global_
+model:
+  name: ARM-7B
+  model_size: 7B
+  path: ../models/ARM-7B
+  inference:
+    tensor_parallel_size: 1
+    enable_prefix_caching: True
+    gpu_memory_utilization: 0.9
+    temperature: 0.9
+    top_p: 0.95
+    max_tokens: 4096
+    skip_special_tokens: True

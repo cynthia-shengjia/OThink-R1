@@ -3,7 +3,7 @@ data:
   datasets:
     CommonsenseQA:
       _target_: core.dataset_processor.CommonsenseQAProcessor
-      path: Your/CommonsenseQA/Data/Path
+      path: ../datasets/CommonsenseQA
       splits:
         train:
           name: train
@@ -14,5 +14,5 @@ data:
           slice: "[:100%]"
           columns_to_remove: ["id", "question", "question_concept", "choices", "answerKey"]
       verify: "choice_selecting"
-      subset: 
+      subset:
       eval_split: "validation"
